@@ -28,9 +28,15 @@ const CAT_COLOR = { Peptides:"#36D1C4", Nootropics:"#FFC857", Supplies:"#8B96A0"
 const MEMBER_RATE = 0.15;
 const money = n => `$${n.toFixed(2)}`;
 const memberPrice = n => n * (1 - MEMBER_RATE);
+
 function addDays(d) {
   const t = new Date(); t.setDate(t.getDate() + d);
   return t.toLocaleDateString("en-US", { month:"short", day:"numeric" });
+}
+function monthAbbr(offset) {
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const d = new Date(); d.setMonth(d.getMonth() - offset);
+  return MONTHS[d.getMonth()];
 }
 
 /* ---- icons ---- */
@@ -58,6 +64,13 @@ const Ico = {
     React.createElement("path", { d:"M5 12h14M13 6l6 6-6 6", strokeLinecap:"round", strokeLinejoin:"round" })),
   ext: p => React.createElement("svg", { viewBox:"0 0 24 24", width:"14", height:"14", fill:"none", stroke:"currentColor", strokeWidth:"2", ...p },
     React.createElement("path", { d:"M18 13v6H6V7h6M15 3h6v6M10 14L21 3", strokeLinecap:"round", strokeLinejoin:"round" })),
+  chart: p => React.createElement("svg", { viewBox:"0 0 24 24", width:"22", height:"22", fill:"none", stroke:"currentColor", strokeWidth:"1.8", ...p },
+    React.createElement("rect", { x:"3",  y:"14", width:"4", height:"7", rx:"1" }),
+    React.createElement("rect", { x:"10", y:"9",  width:"4", height:"12", rx:"1" }),
+    React.createElement("rect", { x:"17", y:"4",  width:"4", height:"17", rx:"1" })),
+  cal: p => React.createElement("svg", { viewBox:"0 0 24 24", width:"14", height:"14", fill:"none", stroke:"currentColor", strokeWidth:"2", ...p },
+    React.createElement("rect", { x:"3", y:"4", width:"18", height:"18", rx:"3" }),
+    React.createElement("path", { d:"M16 2v4M8 2v4M3 10h18", strokeLinecap:"round" })),
 };
 
 function Vial({ color }) {
@@ -97,6 +110,36 @@ function App() {
 
   const daysLeft  = Math.round(cadence * 0.7);
   const runwayPct = Math.max(6, Math.round(daysLeft / cadence * 100));
+
+  /* next 3 scheduled shipments derived from cadence — not usage */
+  const refillDates = useMemo(() =>
+    [0, 1, 2].map(n => ({
+      isNext: n === 0,
+      label:  n === 0 ? "Next refill" : `Refill ${n + 1}`,
+      date:   addDays(daysLeft + n * cadence),
+      days:   daysLeft + n * cadence,
+    })), [daysLeft, cadence]);
+
+  /* simulated 6-month spend history from cadence pattern */
+  const spendHistory = useMemo(() => {
+    const pattern = cadence <= 30 ? [1,1,1,1,1,1]
+                  : cadence <= 60 ? [1,0,1,0,1,0]
+                  :                 [1,0,0,1,0,0];
+    return Array.from({length:6}, (_, i) => ({
+      month: monthAbbr(5 - i),
+      spend: pattern[i] * shipmentTotal,
+    }));
+  }, [cadence, shipmentTotal]);
+
+  const maxSpend        = Math.max(...spendHistory.map(m => m.spend), 1);
+  const monthlySpend    = shipmentTotal * 30 / cadence;
+  const reordersPerYear = Math.round(365 / cadence);
+  const activeCount     = items.filter(p => p.id !== "bac").length;
+
+  const topCompound = useMemo(() => {
+    const active = items.filter(p => p.id !== "bac");
+    return active.length ? active.reduce((a, b) => b.price > a.price ? b : a) : null;
+  }, [items]);
 
   /* ---- GATE ---- */
   if (view === "gate") return React.createElement("div", { className:"xlr-stage" },
@@ -149,6 +192,7 @@ function App() {
               React.createElement("p", { className:"xlr-eyebrow" }, "Your supply"),
               React.createElement("h2", { className:"xlr-screen-h tight" }, "You're covered.")),
             React.createElement("span", { className:"xlr-member-pill" }, "Active member")),
+
           React.createElement("div", { className:"xlr-cover-card" },
             React.createElement("div", { className:"xlr-cover-ring" },
               React.createElement("span", { className:"xlr-cover-days" }, daysLeft),
@@ -158,6 +202,26 @@ function App() {
               React.createElement("p", { className:"xlr-cover-date" }, addDays(daysLeft)),
               React.createElement("p", { className:"xlr-cover-sub" },
                 items.length, " compounds · every ", cadence, " days"))),
+
+          /* upcoming refills timeline — cadence-based, not usage */
+          React.createElement("p", { className:"xlr-section-h" }, "Upcoming refills"),
+          React.createElement("div", { className:"xlr-timeline" },
+            refillDates.map((r, i) => React.createElement(React.Fragment, { key:i },
+              i > 0 && React.createElement("div", { className:"xlr-tl-connector" }),
+              React.createElement("div", { className:`xlr-tl-row${r.isNext?" next":""}` },
+                React.createElement("div", { className:`xlr-tl-dot${r.isNext?" next":""}` },
+                  React.createElement(Ico.cal, null)),
+                React.createElement("div", { className:"xlr-tl-meta" },
+                  React.createElement("div", { className:`xlr-tl-label${r.isNext?" next":""}` }, r.label),
+                  React.createElement("div", { className:"xlr-tl-date" }, r.date),
+                  React.createElement("div", { className:"xlr-tl-days" }, "in ", r.days, " days")),
+                r.isNext && React.createElement("a", {
+                  className:"xlr-tl-cta",
+                  href:STORE_URL,
+                  target:"_blank",
+                  rel:"noopener noreferrer",
+                }, "Reorder ", React.createElement(Ico.ext, null)))))),
+
           React.createElement("p", { className:"xlr-section-h" }, "Your protocol"),
           React.createElement("div", { className:"xlr-list" },
             items.length === 0 && React.createElement("p", { style:{ color:"#8B96A0", fontSize:"13px", textAlign:"center", padding:"20px 0" } },
@@ -181,7 +245,7 @@ function App() {
             href:STORE_URL,
             target:"_blank",
             rel:"noopener noreferrer"
-          }, "Reorder at XLR8 Store", React.createElement(Ico.ext, null)),
+          }, "Reorder at XLR8 Store ", React.createElement(Ico.ext, null)),
           React.createElement("div", { className:"xlr-trust" },
             React.createElement(Ico.doc, null), " COAs attached automatically · ",
             React.createElement(Ico.shield, null), " Research use only")),
@@ -231,8 +295,7 @@ function App() {
               className:"xlr-switch",
               href:STORE_URL,
               target:"_blank",
-              rel:"noopener noreferrer",
-              style:{display:"flex", alignItems:"center", gap:"6px"}
+              rel:"noopener noreferrer"
             }, "Manage billing at the store ", React.createElement(Ico.ext, null))),
 
           React.createElement("p", { className:"xlr-section-h" }, "Supply runway"),
@@ -287,18 +350,74 @@ function App() {
           React.createElement("p", { className:"xlr-fine" },
             "Research use only · Not for human or veterinary use · Not FDA approved")),
 
+        /* ---- INSIGHTS TAB ---- */
+        tab === "insights" && React.createElement("div", { className:"xlr-pad xlr-scroll" },
+          React.createElement("div", { className:"xlr-app-head" },
+            React.createElement("div", null,
+              React.createElement("p", { className:"xlr-eyebrow" }, "Supply & spend"),
+              React.createElement("h2", { className:"xlr-screen-h tight" }, "Insights")),
+            React.createElement("span", { className:"xlr-no-usage-pill" }, "No usage tracked")),
+
+          React.createElement("div", { className:"xlr-kpi-grid" },
+            React.createElement("div", { className:"xlr-kpi" },
+              React.createElement("div", { className:"xlr-kpi-val" }, `~$${Math.round(monthlySpend)}`),
+              React.createElement("div", { className:"xlr-kpi-label" }, "est. spend / month")),
+            React.createElement("div", { className:"xlr-kpi" },
+              React.createElement("div", { className:"xlr-kpi-val" }, reordersPerYear),
+              React.createElement("div", { className:"xlr-kpi-label" }, "reorders / year")),
+            React.createElement("div", { className:"xlr-kpi" },
+              React.createElement("div", { className:"xlr-kpi-val" }, daysLeft),
+              React.createElement("div", { className:"xlr-kpi-label" }, "days covered")),
+            React.createElement("div", { className:"xlr-kpi" },
+              React.createElement("div", { className:"xlr-kpi-val" }, activeCount),
+              React.createElement("div", { className:"xlr-kpi-label" }, "active compounds"))),
+
+          React.createElement("p", { className:"xlr-section-h" }, "Spend — last 6 months"),
+          React.createElement("div", { className:"xlr-chart-card" },
+            React.createElement("div", { className:"xlr-chart" },
+              spendHistory.map((m, i) => React.createElement("div", {
+                key:i,
+                className:`xlr-bar${m.spend > 0 ? " active" : ""}`,
+                style:{ height: m.spend > 0 ? `${Math.max(18, Math.round(m.spend / maxSpend * 80))}px` : "8px" }
+              }))),
+            React.createElement("div", { className:"xlr-chart-labels" },
+              spendHistory.map((m, i) => React.createElement("span", { key:i }, m.month))),
+            React.createElement("p", { className:"xlr-chart-note" },
+              "Derived from shipment cadence & member pricing — no usage data.")),
+
+          topCompound && React.createElement(React.Fragment, null,
+            React.createElement("p", { className:"xlr-section-h" }, "Most-reordered compound"),
+            React.createElement("div", { className:"xlr-top-compound" },
+              React.createElement(Vial, { color:CAT_COLOR[topCompound.cat] }),
+              React.createElement("div", { className:"xlr-top-meta" },
+                React.createElement("b", null, topCompound.name),
+                React.createElement("span", null, topCompound.spec, " · ", money(memberPrice(topCompound.price)), " member")),
+              React.createElement("a", {
+                className:"xlr-tl-cta",
+                href:STORE_URL,
+                target:"_blank",
+                rel:"noopener noreferrer",
+              }, "Reorder ", React.createElement(Ico.ext, null)))),
+
+          React.createElement("p", { className:"xlr-insights-footer" },
+            "All figures derived from your refill schedule and catalog pricing. No dosing, consumption, or usage data is collected or displayed.")),
+
         /* ---- NAV ---- */
         React.createElement("nav", { className:"xlr-tabs" },
-          [["supply","Supply",Ico.box],["catalog","Catalog",Ico.grid],["account","Manage",Ico.user]]
-            .map(([k,label,I]) => React.createElement("button", {
-              key:k,
-              className:tab===k?"on":"",
-              onClick:() => setTab(k)
-            }, React.createElement(I, null), React.createElement("span", null, label)))),
+          [
+            ["supply",   "Supply",   Ico.box],
+            ["catalog",  "Catalog",  Ico.grid],
+            ["account",  "Manage",   Ico.user],
+            ["insights", "Insights", Ico.chart],
+          ].map(([k,label,I]) => React.createElement("button", {
+            key:k,
+            className:tab===k?"on":"",
+            onClick:() => setTab(k)
+          }, React.createElement(I, null), React.createElement("span", null, label)))),
 
         toast && React.createElement("div", { className:"xlr-toast" }, toast))),
     React.createElement("p", { className:"xlr-hint" },
-      "Gate → Supply → Catalog → Manage · Reorder hands off to the external store."));
+      "Supply (refill timeline) · Catalog · Manage · Insights (spend & supply) · Reorder hands off to the store."));
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
