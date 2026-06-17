@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "XLR8 Manager",
+    "slug": "xlr8-manager",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "xlr8manager",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0D10",
+    "splash": {
+      "backgroundColor": "#0A0D10"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.xlr8research.manager",
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "Reminders when your supply runway is low."
+      }
+    },
+    "android": {
+      "package": "com.xlr8research.manager",
+      "permissions": ["RECEIVE_BOOT_COMPLETED", "VIBRATE"]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#FF5A1F"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
