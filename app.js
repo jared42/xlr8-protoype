@@ -24,7 +24,7 @@ const PRODUCTS = [
   { id:"bac",    name:"BAC Water",       spec:"3ml",       price:  9.99, cat:"Supplies",   tag:"Incl. free" },
 ];
 
-const CAT_COLOR = { Peptides:"#36D1C4", Nootropics:"#FFC857", Supplies:"#8B96A0" };
+const CAT_COLOR = { Peptides:"#54C5C2", Nootropics:"#F5A623", Supplies:"#8AA0B2" };
 const MEMBER_RATE = 0.15;
 const money = n => `$${n.toFixed(2)}`;
 const memberPrice = n => n * (1 - MEMBER_RATE);
@@ -224,7 +224,7 @@ function App() {
 
           React.createElement("p", { className:"xlr-section-h" }, "Your protocol"),
           React.createElement("div", { className:"xlr-list" },
-            items.length === 0 && React.createElement("p", { style:{ color:"#8B96A0", fontSize:"13px", textAlign:"center", padding:"20px 0" } },
+            items.length === 0 && React.createElement("p", { style:{ color:"#62748A", fontSize:"13px", textAlign:"center", padding:"20px 0" } },
               "Add compounds from the Catalog tab."),
             items.map(p => React.createElement("div", { key:p.id, className:"xlr-line" },
               React.createElement(Vial, { color:CAT_COLOR[p.cat] }),
@@ -290,7 +290,7 @@ function App() {
               React.createElement("span", { className:"xlr-member-pill" }, "Active · Annual")),
             React.createElement("div", { className:"xlr-acc-row" },
               React.createElement("span", null, "Member pricing"),
-              React.createElement("b", { style:{color:"#36D1C4"} }, "15% off all compounds")),
+              React.createElement("b", { style:{color:"#159AAE"} }, "15% off all compounds")),
             React.createElement("a", {
               className:"xlr-switch",
               href:STORE_URL,
