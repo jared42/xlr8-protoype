@@ -1,0 +1,599 @@
+import React, { useState, useMemo } from "react";
+
+/* ------------------------------------------------------------------ */
+/*  XLR8 CONTINUITY — MVP prototype                                    */
+/*  Core job-to-be-done: your research never stalls on a restock.      */
+/*  Recurring membership + auto-ship, framed for Research-Use-Only.     */
+/* ------------------------------------------------------------------ */
+
+const PRODUCTS = [
+  { id: "reta", name: "Retatrutide", spec: "30mg", price: 249.99, cat: "Peptides", tag: "Top seller" },
+  { id: "tesa", name: "Tesamorelin", spec: "20mg", price: 109.99, cat: "Peptides", tag: "Featured" },
+  { id: "bpc", name: "BPC-157", spec: "10mg", price: 59.99, cat: "Peptides" },
+  { id: "cjc10", name: "CJC-1295 no DAC", spec: "10mg", price: 109.99, cat: "Peptides" },
+  { id: "cjcipa", name: "CJC-1295 / IPA", spec: "5mg / 5mg", price: 99.99, cat: "Peptides" },
+  { id: "cjcdac", name: "CJC-1295 w/ DAC", spec: "5mg", price: 89.99, cat: "Peptides" },
+  { id: "ghk", name: "GHK-Cu", spec: "100mg", price: 59.99, cat: "Peptides" },
+  { id: "epi", name: "Epitalon", spec: "50mg", price: 59.99, cat: "Peptides" },
+  { id: "dsip", name: "DSIP", spec: "10mg", price: 49.99, cat: "Peptides" },
+  { id: "ara", name: "ARA-290", spec: "10mg", price: 49.99, cat: "Peptides" },
+  { id: "aod", name: "AOD-9604", spec: "10mg", price: 99.99, cat: "Peptides" },
+  { id: "fox", name: "FOX-04", spec: "10mg", price: 149.99, cat: "Peptides" },
+  { id: "amq", name: "5-Amino-1MQ", spec: "50mg", price: 99.99, cat: "Nootropics" },
+  { id: "bac", name: "BAC Water", spec: "3ml", price: 9.99, cat: "Supplies", tag: "Free for members" },
+];
+
+const CAT_COLOR = {
+  Peptides: "#36D1C4",
+  Nootropics: "#FFC857",
+  SARMs: "#A78BFA",
+  Supplies: "#8B96A0",
+};
+
+const MEMBER_RATE = 0.15; // 15% member pricing
+const money = (n) => `$${n.toFixed(2)}`;
+const memberPrice = (n) => n * (1 - MEMBER_RATE);
+
+function addDays(d) {
+  const t = new Date();
+  t.setDate(t.getDate() + d);
+  return t.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/* ---- tiny inline icons ---- */
+const Ico = {
+  shield: (p) => (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" strokeLinejoin="round" />
+      <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  box: (p) => (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M3 7l9-4 9 4v10l-9 4-9-4V7z" strokeLinejoin="round" />
+      <path d="M3 7l9 4 9-4M12 11v10" strokeLinejoin="round" />
+    </svg>
+  ),
+  grid: (p) => (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" />
+    </svg>
+  ),
+  spark: (p) => (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  ),
+  user: (p) => (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" strokeLinecap="round" />
+    </svg>
+  ),
+  check: (p) => (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" {...p}>
+      <path d="M5 12l5 5L19 7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  doc: (p) => (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}>
+      <path d="M6 3h8l4 4v14H6z" strokeLinejoin="round" /><path d="M14 3v4h4M9 13h6M9 17h6" strokeLinecap="round" />
+    </svg>
+  ),
+  arrow: (p) => (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" {...p}>
+      <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+};
+
+/* ---- vial illustration ---- */
+function Vial({ color }) {
+  return (
+    <div className="xlr-vial">
+      <span className="xlr-vial-cap" style={{ background: color }} />
+      <span className="xlr-vial-body">
+        <span className="xlr-vial-liquid" style={{ background: `${color}26`, borderTop: `2px solid ${color}` }} />
+      </span>
+    </div>
+  );
+}
+
+function Wordmark({ small }) {
+  return (
+    <span className={`xlr-mark ${small ? "xlr-mark-sm" : ""}`}>
+      XLR<span className="xlr-mark-8">8</span>
+    </span>
+  );
+}
+
+export default function App() {
+  const [view, setView] = useState("gate"); // gate | app
+  const [tab, setTab] = useState("supply");
+  const [plan] = useState("annual"); // membership managed externally; shown as status only
+  const [cadence, setCadence] = useState(30);
+  const [filter, setFilter] = useState("All");
+  const [protocol, setProtocol] = useState(["bpc", "tesa", "bac"]);
+  const [toast, setToast] = useState(null);
+
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 1600); };
+  // payment + checkout live OUTSIDE the app — these only hand off to the store
+  const openStore = (m) => flash(m || "Opening XLR8 store…");
+
+  const items = useMemo(
+    () => protocol.map((id) => PRODUCTS.find((p) => p.id === id)).filter(Boolean),
+    [protocol]
+  );
+  const shipmentTotal = useMemo(
+    () => items.reduce((s, p) => s + (p.id === "bac" ? 0 : memberPrice(p.price)), 0),
+    [items]
+  );
+  const toggle = (id) => {
+    setProtocol((prev) => {
+      if (prev.includes(id)) { flash("Removed from protocol"); return prev.filter((x) => x !== id); }
+      flash("Added to your protocol"); return [...prev, id];
+    });
+  };
+
+  const cats = ["All", "Peptides", "Nootropics", "Supplies"];
+  const visible = filter === "All" ? PRODUCTS : PRODUCTS.filter((p) => p.cat === filter);
+
+  // --- cost summary: normalize membership + product to a true monthly figure ---
+  const membershipMonthly = plan === "annual" ? 149 / 12 : 19;
+  const productMonthly = shipmentTotal * (30 / cadence); // shipment cost spread across the cadence
+  const totalMonthly = membershipMonthly + productMonthly;
+
+  // --- supply runway: derived from shipment cadence, NOT usage. counts down to next box ---
+  const daysLeft = Math.round(cadence * 0.7); // notional mid-cycle for the demo
+  const runwayPct = Math.max(6, Math.round((daysLeft / cadence) * 100));
+
+  return (
+    <div className="xlr-stage">
+      <style>{CSS}</style>
+
+      <div className="xlr-caption">
+        <Wordmark small /> <span>Continuity — management layer</span>
+      </div>
+
+      <div className="xlr-phone">
+        <div className="xlr-island" />
+        <div className="xlr-screen">
+          <div className="xlr-statusbar">
+            <span>9:41</span>
+            <span className="xlr-status-icons">
+              <i className="xlr-sig" /><i className="xlr-wifi" /><i className="xlr-batt" />
+            </span>
+          </div>
+
+          {/* ---------------- GATE ---------------- */}
+          {view === "gate" && (
+            <div className="xlr-pad xlr-gate">
+              <div className="xlr-gate-top">
+                <Wordmark />
+                <p className="xlr-eyebrow">Continuity Program</p>
+              </div>
+              <div className="xlr-gate-card">
+                <div className="xlr-gate-ico"><Ico.shield /></div>
+                <h2>Research use only</h2>
+                <p>
+                  By entering you confirm you are a qualified laboratory researcher and
+                  all compounds are for <b>in vitro laboratory research only</b> — not for human or
+                  veterinary use, and not approved by the FDA.
+                </p>
+              </div>
+              <button
+                className="xlr-cta"
+                onClick={() => { setView("app"); setTab("supply"); }}
+              >
+                Enter <Ico.arrow />
+              </button>
+            </div>
+          )}
+
+          {/* ---------------- APP: SUPPLY ---------------- */}
+          {view === "app" && tab === "supply" && (
+            <div className="xlr-pad xlr-scroll">
+              <div className="xlr-app-head">
+                <div><p className="xlr-eyebrow">Your supply</p><h2 className="xlr-screen-h tight">You're covered.</h2></div>
+                <span className="xlr-member-pill">{plan === "annual" ? "Annual" : "Monthly"} member</span>
+              </div>
+
+              <div className="xlr-cover-card">
+                <div className="xlr-cover-ring">
+                  <span className="xlr-cover-days">{daysLeft}</span>
+                  <span className="xlr-cover-unit">days</span>
+                </div>
+                <div className="xlr-cover-meta">
+                  <p className="xlr-cover-label">Next delivery</p>
+                  <p className="xlr-cover-date">{addDays(daysLeft)}</p>
+                  <p className="xlr-cover-sub">{items.length} compounds · every {cadence} days</p>
+                </div>
+              </div>
+
+              <div className="xlr-quick">
+                <button className="primary" onClick={() => openStore("Opening XLR8 store to reorder…")}>Reorder now</button>
+                <button onClick={() => setTab("catalog")}>Add compound</button>
+                <button onClick={() => setTab("account")}>Manage</button>
+              </div>
+
+              <p className="xlr-section-h">Your protocol</p>
+              <div className="xlr-list">
+                {items.map((p) => (
+                  <div key={p.id} className="xlr-line">
+                    <Vial color={CAT_COLOR[p.cat]} />
+                    <div className="xlr-line-meta">
+                      <b>{p.name}</b>
+                      <span className="xlr-mono">{p.spec}</span>
+                    </div>
+                    <div className="xlr-line-price">
+                      {p.id === "bac"
+                        ? <span className="xlr-free">Free</span>
+                        : <><span className="xlr-mono">{money(memberPrice(p.price))}</span>
+                            <s className="xlr-mono">{money(p.price)}</s></>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="xlr-ship-total">
+                <span>Est. this refill</span>
+                <span className="xlr-mono big">{money(shipmentTotal)}</span>
+              </div>
+              <button className="xlr-reorder" onClick={() => openStore("Opening XLR8 store to reorder…")}>
+                Reorder at the store <Ico.arrow />
+              </button>
+              <p className="xlr-handoff-note">Checkout happens at the XLR8 store — nothing is charged in the app.</p>
+              <div className="xlr-trust">
+                <Ico.doc /> COAs in your vault · <Ico.shield /> Research use only
+              </div>
+            </div>
+          )}
+
+          {/* ---------------- APP: CATALOG ---------------- */}
+          {view === "app" && tab === "catalog" && (
+            <div className="xlr-pad xlr-scroll">
+              <h2 className="xlr-screen-h">Catalog</h2>
+              <p className="xlr-screen-sub">Track the compounds in your protocol. Reorders hand off to the store.</p>
+              <div className="xlr-chips">
+                {cats.map((c) => (
+                  <button key={c} className={`xlr-chip ${filter === c ? "on" : ""}`} onClick={() => setFilter(c)}>{c}</button>
+                ))}
+              </div>
+              <div className="xlr-grid">
+                {visible.map((p) => {
+                  const inP = protocol.includes(p.id);
+                  return (
+                    <div key={p.id} className="xlr-card">
+                      {p.tag && <span className="xlr-card-tag">{p.tag}</span>}
+                      <Vial color={CAT_COLOR[p.cat]} />
+                      <b className="xlr-card-name">{p.name}</b>
+                      <span className="xlr-mono xlr-card-spec">{p.spec}</span>
+                      <div className="xlr-card-price">
+                        <span className="xlr-mono">{money(memberPrice(p.price))}</span>
+                        <s className="xlr-mono">{money(p.price)}</s>
+                      </div>
+                      <button className={`xlr-add ${inP ? "added" : ""}`} onClick={() => toggle(p.id)}>
+                        {inP ? <><Ico.check /> Added</> : "+ Add"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ---------------- APP: ACCOUNT ---------------- */}
+          {view === "app" && tab === "account" && (
+            <div className="xlr-pad xlr-scroll">
+              <h2 className="xlr-screen-h">Manage</h2>
+
+              <div className="xlr-acc-card">
+                <div className="xlr-acc-row">
+                  <span>Membership</span>
+                  <b>{plan === "annual" ? "Annual · $149/yr" : "Monthly · $19/mo"}</b>
+                </div>
+                <button className="xlr-switch" onClick={() => openStore()}>
+                  Manage billing at the store →
+                </button>
+              </div>
+
+              <p className="xlr-section-h">Supply runway</p>
+              <div className="xlr-runway">
+                <div className="xlr-runway-top">
+                  <div>
+                    <p className="xlr-runway-days"><span>{daysLeft}</span> days of cover left</p>
+                    <p className="xlr-runway-sub">Reorder by {addDays(daysLeft)} · {cadence}-day cadence</p>
+                  </div>
+                  <span className="xlr-runway-pill">On track</span>
+                </div>
+                <div className="xlr-runway-bar"><i style={{ width: `${runwayPct}%` }} /></div>
+                <p className="xlr-runway-note">Counts down from your last refill. We'll remind you to reorder before it runs out.</p>
+              </div>
+
+              <p className="xlr-section-h">What you're spending</p>
+              <div className="xlr-cost">
+                <div className="xlr-cost-row">
+                  <span>Membership</span>
+                  <span className="xlr-mono">{money(membershipMonthly)}</span>
+                </div>
+                <div className="xlr-cost-row">
+                  <span>Compounds <em>({items.filter(p=>p.id!=="bac").length} items, every {cadence}d)</em></span>
+                  <span className="xlr-mono">{money(productMonthly)}</span>
+                </div>
+                <div className="xlr-cost-row sub">
+                  <span>BAC water + supplies</span>
+                  <span className="xlr-free">Included</span>
+                </div>
+                <div className="xlr-cost-total">
+                  <span>Total per month</span>
+                  <span className="xlr-mono">{money(totalMonthly)}</span>
+                </div>
+                <p className="xlr-cost-note">
+                  ≈ {money(totalMonthly * 12)}/yr all-in · {money(shipmentTotal)} per refill, paid at the store
+                </p>
+              </div>
+
+              <p className="xlr-section-h">Refill reminder cadence</p>
+              <div className="xlr-cadence">
+                {[30, 60, 90].map((d) => (
+                  <button key={d} className={`xlr-cad ${cadence === d ? "on" : ""}`} onClick={() => { setCadence(d); flash(`Reminder cadence set to ${d} days`); }}>
+                    {d}<span>days</span>
+                  </button>
+                ))}
+              </div>
+
+              <p className="xlr-section-h">Documentation</p>
+              <div className="xlr-vault">
+                {items.filter((p) => p.id !== "bac").map((p) => (
+                  <div key={p.id} className="xlr-vault-row">
+                    <Ico.doc /> <span>{p.name} {p.spec}</span>
+                    <span className="xlr-vault-link">COA</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="xlr-acc-actions">
+                <button className="primary-action" onClick={() => openStore("Opening XLR8 store to reorder…")}>Reorder at the store</button>
+                <button onClick={() => openStore()}>Manage billing at the store</button>
+              </div>
+              <p className="xlr-fine">Research use only. Not for human or veterinary use. Not FDA approved.</p>
+            </div>
+          )}
+
+          {/* ---------------- TAB BAR ---------------- */}
+          {view === "app" && (
+            <nav className="xlr-tabs">
+              {[
+                ["supply", "Supply", Ico.box],
+                ["catalog", "Catalog", Ico.grid],
+                ["account", "Manage", Ico.user],
+              ].map(([k, label, I]) => (
+                <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
+                  <I /><span>{label}</span>
+                </button>
+              ))}
+            </nav>
+          )}
+
+          {toast && <div className="xlr-toast">{toast}</div>}
+        </div>
+      </div>
+
+      <p className="xlr-hint">
+        Tap through it: confirm the gate → manage your protocol, track refills &amp; spend → "Reorder" hands off to the store. No payment happens in-app.
+      </p>
+    </div>
+  );
+}
+
+const CSS = `
+.xlr-stage{
+  --bg:#0A0D10; --surface:#14181D; --surface2:#1B2128; --ink:#EFF2F1;
+  --muted:#8B96A0; --line:#232A31; --accent:#FF5A1F; --accent2:#E84D17; --teal:#36D1C4;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,monospace;
+  font-family:var(--font); color:var(--ink);
+  min-height:100%; display:flex; flex-direction:column; align-items:center;
+  gap:14px; padding:26px 16px 40px;
+  background:radial-gradient(120% 80% at 50% -10%,#13191f 0%,#070a0d 60%);
+}
+.xlr-stage *{box-sizing:border-box;}
+.xlr-caption{display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; letter-spacing:.02em;}
+.xlr-mark{font-weight:800; letter-spacing:-.04em; font-size:22px; color:var(--ink);}
+.xlr-mark-8{color:var(--accent);}
+.xlr-mark-sm{font-size:15px;}
+
+/* phone */
+.xlr-phone{
+  position:relative; width:380px; max-width:94vw; height:760px;
+  border-radius:52px; padding:11px; background:#000;
+  box-shadow:0 0 0 2px #20262d, 0 30px 70px -20px rgba(0,0,0,.8);
+}
+.xlr-island{position:absolute; top:22px; left:50%; transform:translateX(-50%); width:108px; height:30px; background:#000; border-radius:18px; z-index:30;}
+.xlr-screen{position:relative; width:100%; height:100%; border-radius:42px; overflow:hidden; background:var(--bg); display:flex; flex-direction:column;}
+.xlr-statusbar{display:flex; justify-content:space-between; align-items:center; padding:14px 30px 6px; font-size:13px; font-weight:600; flex-shrink:0;}
+.xlr-status-icons{display:flex; gap:6px; align-items:center;}
+.xlr-sig,.xlr-wifi,.xlr-batt{display:inline-block; background:var(--ink); border-radius:2px;}
+.xlr-sig{width:16px;height:10px;clip-path:polygon(0 100%,20% 100%,20% 60%,40% 60%,40% 100%,55% 100%,55% 30%,75% 30%,75% 100%,100% 100%,100% 0,85% 0);}
+.xlr-wifi{width:15px;height:11px;border-radius:0 0 0 0;mask:radial-gradient(circle at 50% 100%,transparent 30%,#000 31%);}
+.xlr-batt{width:22px;height:11px;border-radius:3px;}
+
+.xlr-pad{padding:6px 20px 20px; flex:1; min-height:0;}
+.xlr-scroll{overflow-y:auto; padding-bottom:96px;}
+.xlr-scroll::-webkit-scrollbar{width:0;}
+
+.accent{color:var(--accent);}
+.xlr-eyebrow{font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); font-weight:700; margin:0 0 4px;}
+.xlr-screen-h{font-size:27px; font-weight:800; letter-spacing:-.03em; margin:0 0 4px;}
+.xlr-screen-h.tight{margin:0;}
+.xlr-screen-sub{color:var(--muted); font-size:14px; margin:0 0 18px; line-height:1.45;}
+.xlr-section-h{font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700; margin:22px 0 10px;}
+.xlr-mono{font-family:var(--mono); font-variant-numeric:tabular-nums;}
+
+/* CTA */
+.xlr-cta{
+  width:100%; margin-top:auto; border:0; cursor:pointer;
+  background:var(--accent); color:#0A0D10; font-weight:800; font-size:16px;
+  padding:16px; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:8px;
+  letter-spacing:-.01em; transition:transform .15s, background .15s; font-family:var(--font);
+}
+.xlr-cta:hover{background:var(--accent2);}
+.xlr-cta:active{transform:scale(.98);}
+.xlr-cta:disabled{background:var(--surface2); color:var(--muted); cursor:not-allowed;}
+
+/* gate */
+.xlr-gate{display:flex; flex-direction:column; padding-top:30px;}
+.xlr-gate-top{text-align:center; margin-bottom:26px;}
+.xlr-gate-top .xlr-eyebrow{margin-top:6px;}
+.xlr-gate-card{background:var(--surface); border:1px solid var(--line); border-radius:22px; padding:26px 22px; text-align:center;}
+.xlr-gate-ico{width:52px; height:52px; border-radius:14px; background:rgba(54,209,196,.12); color:var(--teal); display:flex; align-items:center; justify-content:center; margin:0 auto 16px;}
+.xlr-gate-card h2{font-size:20px; font-weight:800; margin:0 0 10px; letter-spacing:-.02em;}
+.xlr-gate-card p{color:var(--muted); font-size:13.5px; line-height:1.55; margin:0 0 20px;}
+.xlr-gate-card b{color:var(--ink);}
+.xlr-agree{display:flex; align-items:center; gap:11px; width:100%; text-align:left; background:var(--surface2); border:1px solid var(--line); color:var(--ink); padding:13px 14px; border-radius:13px; font-size:13.5px; font-weight:600; cursor:pointer; font-family:var(--font);}
+.xlr-agree.on{border-color:var(--teal);}
+.xlr-chk{width:22px; height:22px; border-radius:7px; border:1.5px solid var(--muted); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#0A0D10;}
+.xlr-agree.on .xlr-chk{background:var(--teal); border-color:var(--teal);}
+
+/* promise */
+.xlr-promise{display:flex; flex-direction:column; padding-top:24px;}
+.xlr-hero-h{font-size:42px; line-height:1.02; font-weight:800; letter-spacing:-.045em; margin:8px 0 16px;}
+.xlr-hero-sub{color:var(--muted); font-size:15px; line-height:1.5; margin:0 0 24px;}
+.xlr-promise-list{display:flex; flex-direction:column; gap:14px; margin-bottom:26px;}
+.xlr-promise-row{display:flex; gap:13px;}
+.xlr-promise-dot{width:26px;height:26px;border-radius:9px;background:rgba(255,90,31,.14);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.xlr-promise-row div{display:flex; flex-direction:column;}
+.xlr-promise-row b{font-size:15px; font-weight:700;}
+.xlr-promise-row span{color:var(--muted); font-size:13px; line-height:1.4;}
+
+/* plans */
+.xlr-plan{position:relative; width:100%; text-align:left; background:var(--surface); border:1.5px solid var(--line); border-radius:18px; padding:18px; margin-bottom:12px; cursor:pointer; transition:border-color .15s, background .15s; font-family:var(--font); color:var(--ink);}
+.xlr-plan.sel{border-color:var(--accent); background:#1a1410;}
+.xlr-plan-badge{position:absolute; top:-9px; right:16px; background:var(--accent); color:#0A0D10; font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px; letter-spacing:.02em;}
+.xlr-plan-head{display:flex; align-items:center; gap:13px;}
+.xlr-plan-head b{font-size:18px; font-weight:800; display:block;}
+.xlr-plan-price{color:var(--muted); font-size:14px;}
+.xlr-plan-price em{color:var(--ink); font-style:normal; font-weight:800; font-size:22px; font-family:var(--mono);}
+.xlr-radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.xlr-plan.sel .xlr-radio{border-color:var(--accent);}
+.xlr-radio i{width:11px;height:11px;border-radius:50%;background:var(--accent);}
+.xlr-plan-note{color:var(--muted); font-size:12.5px; margin:9px 0 0; padding-left:35px;}
+.xlr-perks{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:18px; margin:8px 0 18px;}
+.xlr-perks-h{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:700; margin:0 0 12px;}
+.xlr-perk{display:flex; align-items:center; gap:10px; font-size:13.5px; padding:5px 0; color:var(--ink);}
+.xlr-perk span{color:var(--teal); display:flex;}
+.xlr-fine{color:var(--muted); font-size:11px; text-align:center; margin:14px 0 0; line-height:1.4;}
+
+/* supply */
+.xlr-app-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;}
+.xlr-member-pill{background:rgba(54,209,196,.12); color:var(--teal); font-size:11px; font-weight:700; padding:5px 11px; border-radius:20px; white-space:nowrap;}
+.xlr-cover-card{background:linear-gradient(135deg,#1a1410,#14181D); border:1px solid var(--line); border-radius:22px; padding:20px; display:flex; align-items:center; gap:18px;}
+.xlr-cover-ring{width:84px;height:84px;border-radius:50%;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:conic-gradient(var(--accent) 0% 70%,#2a2118 70% 100%);position:relative;animation:xlr-pulse 3s ease-in-out infinite;}
+.xlr-cover-ring::after{content:"";position:absolute;inset:7px;border-radius:50%;background:#14120f;}
+.xlr-cover-days{font-size:26px;font-weight:800;font-family:var(--mono);z-index:2;line-height:1;}
+.xlr-cover-unit{font-size:11px;color:var(--muted);z-index:2;}
+@keyframes xlr-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,90,31,.0);}50%{box-shadow:0 0 0 6px rgba(255,90,31,.08);}}
+.xlr-cover-label{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-weight:700; margin:0;}
+.xlr-cover-date{font-size:24px; font-weight:800; margin:3px 0; letter-spacing:-.02em;}
+.xlr-cover-sub{color:var(--muted); font-size:12.5px; margin:0;}
+.xlr-quick{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:14px;}
+.xlr-quick button{background:var(--surface2); border:1px solid var(--line); color:var(--ink); font-size:12.5px; font-weight:600; padding:11px 4px; border-radius:12px; cursor:pointer; font-family:var(--font);}
+.xlr-quick button:active{background:var(--surface);}
+.xlr-quick button.primary{background:var(--accent); color:#0A0D10; border-color:transparent;}
+.xlr-reorder{width:100%; margin-top:12px; border:0; cursor:pointer; background:var(--accent); color:#0A0D10; font-weight:800; font-size:15px; padding:14px; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:7px; font-family:var(--font);}
+.xlr-reorder:active{transform:scale(.98);}
+.xlr-handoff-note{color:var(--muted); font-size:11.5px; text-align:center; margin:9px 0 0; line-height:1.4;}
+
+.xlr-list{display:flex; flex-direction:column; gap:8px;}
+.xlr-line{display:flex; align-items:center; gap:13px; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:12px 14px;}
+.xlr-line-meta{flex:1; display:flex; flex-direction:column; gap:2px;}
+.xlr-line-meta b{font-size:14.5px; font-weight:700;}
+.xlr-line-meta .xlr-mono{font-size:12px; color:var(--muted);}
+.xlr-line-price{text-align:right; display:flex; flex-direction:column;}
+.xlr-line-price .xlr-mono{font-size:14px; font-weight:700;}
+.xlr-line-price s{font-size:11px; color:var(--muted);}
+.xlr-free{color:var(--teal); font-weight:700; font-size:13px;}
+.xlr-ship-total{display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding:15px 16px; background:var(--surface2); border-radius:14px; font-size:14px; font-weight:600;}
+.xlr-ship-total .big{font-size:20px; font-weight:800;}
+.xlr-trust{display:flex; align-items:center; gap:6px; justify-content:center; color:var(--muted); font-size:11.5px; margin-top:14px; flex-wrap:wrap;}
+.xlr-trust svg{opacity:.7;}
+
+/* catalog */
+.xlr-chips{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
+.xlr-chip{background:var(--surface2); border:1px solid var(--line); color:var(--muted); font-size:13px; font-weight:600; padding:7px 14px; border-radius:20px; cursor:pointer; font-family:var(--font);}
+.xlr-chip.on{background:var(--ink); color:#0A0D10; border-color:var(--ink);}
+.xlr-grid{display:grid; grid-template-columns:1fr 1fr; gap:11px;}
+.xlr-card{position:relative; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px 14px; display:flex; flex-direction:column; align-items:center; text-align:center;}
+.xlr-card-tag{position:absolute; top:9px; left:9px; background:rgba(255,90,31,.14); color:var(--accent); font-size:9.5px; font-weight:800; padding:3px 7px; border-radius:8px; letter-spacing:.03em;}
+.xlr-card-name{font-size:14px; font-weight:700; margin-top:10px; line-height:1.15;}
+.xlr-card-spec{font-size:11.5px; color:var(--muted); margin-top:2px;}
+.xlr-card-price{display:flex; align-items:baseline; gap:6px; margin:8px 0 11px;}
+.xlr-card-price .xlr-mono{font-size:14px; font-weight:800;}
+.xlr-card-price s{font-size:11px; color:var(--muted);}
+.xlr-add{width:100%; background:var(--surface2); border:1px solid var(--line); color:var(--ink); font-size:13px; font-weight:700; padding:9px; border-radius:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; font-family:var(--font);}
+.xlr-add.added{background:rgba(54,209,196,.12); color:var(--teal); border-color:transparent;}
+
+/* account */
+.xlr-acc-card{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:18px; margin-bottom:6px;}
+.xlr-acc-row{display:flex; justify-content:space-between; align-items:center; font-size:14px; color:var(--muted); margin-bottom:14px;}
+.xlr-acc-row b{color:var(--ink); font-size:15px;}
+.xlr-switch{width:100%; background:var(--surface2); border:1px solid var(--line); color:var(--ink); font-weight:600; font-size:13.5px; padding:11px; border-radius:12px; cursor:pointer; font-family:var(--font);}
+.xlr-cadence{display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px;}
+.xlr-cad{background:var(--surface); border:1.5px solid var(--line); color:var(--ink); font-size:22px; font-weight:800; font-family:var(--mono); padding:14px 0 11px; border-radius:14px; cursor:pointer; display:flex; flex-direction:column; align-items:center;}
+.xlr-cad span{font-size:11px; color:var(--muted); font-weight:600; font-family:var(--font);}
+.xlr-cad.on{border-color:var(--accent); background:#1a1410; color:var(--accent);}
+.xlr-cad.on span{color:var(--accent);}
+.xlr-vault{display:flex; flex-direction:column; gap:7px;}
+.xlr-vault-row{display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:13.5px;}
+.xlr-vault-row svg{color:var(--teal);}
+.xlr-vault-row span:first-of-type{flex:1;}
+.xlr-vault-link{color:var(--accent); font-weight:700; font-size:12px;}
+.xlr-acc-actions{display:flex; flex-direction:column; gap:9px; margin-top:22px;}
+.xlr-acc-actions button{background:var(--surface2); border:1px solid var(--line); color:var(--ink); font-weight:600; font-size:14px; padding:13px; border-radius:13px; cursor:pointer; font-family:var(--font);}
+.xlr-acc-actions .ghost{background:transparent; color:var(--muted); border-color:transparent;}
+.xlr-acc-actions .primary-action{background:var(--accent); color:#0A0D10; border-color:transparent; font-weight:800;}
+
+/* runway */
+.xlr-runway{background:linear-gradient(135deg,#101a18,#14181D); border:1px solid var(--line); border-radius:18px; padding:18px;}
+.xlr-runway-top{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;}
+.xlr-runway-days{font-size:17px; font-weight:800; margin:0; letter-spacing:-.02em;}
+.xlr-runway-days span{font-family:var(--mono); color:var(--teal); font-size:22px;}
+.xlr-runway-sub{color:var(--muted); font-size:12.5px; margin:4px 0 0;}
+.xlr-runway-pill{background:rgba(54,209,196,.12); color:var(--teal); font-size:11px; font-weight:700; padding:5px 11px; border-radius:20px; white-space:nowrap;}
+.xlr-runway-bar{height:8px; background:#0c1114; border-radius:6px; overflow:hidden;}
+.xlr-runway-bar i{display:block; height:100%; background:linear-gradient(90deg,var(--teal),#5fe0d6); border-radius:6px; transition:width .4s ease;}
+.xlr-runway-note{color:var(--muted); font-size:11.5px; margin:11px 0 0; line-height:1.4;}
+
+/* cost */
+.xlr-cost{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:6px 18px 18px;}
+.xlr-cost-row{display:flex; justify-content:space-between; align-items:center; padding:14px 0 0; font-size:14px;}
+.xlr-cost-row span:first-child{color:var(--ink);}
+.xlr-cost-row em{color:var(--muted); font-style:normal; font-size:12px;}
+.xlr-cost-row .xlr-mono{font-weight:700; font-size:15px;}
+.xlr-cost-row.sub span:first-child{color:var(--muted); font-size:13px;}
+.xlr-cost-total{display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); font-size:15px; font-weight:800;}
+.xlr-cost-total .xlr-mono{font-size:22px; color:var(--accent);}
+.xlr-cost-note{color:var(--muted); font-size:11.5px; margin:12px 0 0; text-align:right; font-family:var(--mono);}
+
+/* tabs */
+.xlr-tabs{position:absolute; bottom:0; left:0; right:0; display:flex; background:rgba(10,13,16,.92); backdrop-filter:blur(12px); border-top:1px solid var(--line); padding:9px 0 22px; z-index:20;}
+.xlr-tabs button{flex:1; background:none; border:0; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; font-weight:600; cursor:pointer; font-family:var(--font);}
+.xlr-tabs button.on{color:var(--accent);}
+
+/* vial */
+.xlr-vial{position:relative; width:20px; height:40px; flex-shrink:0; display:flex; flex-direction:column; align-items:center;}
+.xlr-vial-cap{width:13px; height:7px; border-radius:3px 3px 1px 1px;}
+.xlr-vial-body{position:relative; width:18px; flex:1; margin-top:1px; background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:3px 3px 7px 7px; overflow:hidden;}
+.xlr-vial-liquid{position:absolute; bottom:0; left:0; right:0; height:55%;}
+
+/* toast */
+.xlr-toast{position:absolute; bottom:96px; left:50%; transform:translateX(-50%); background:var(--ink); color:#0A0D10; font-size:13px; font-weight:700; padding:11px 18px; border-radius:24px; white-space:nowrap; z-index:40; animation:xlr-up .2s ease;}
+@keyframes xlr-up{from{opacity:0; transform:translate(-50%,8px);}to{opacity:1; transform:translate(-50%,0);}}
+
+.xlr-hint{color:var(--muted); font-size:12.5px; text-align:center; max-width:360px; line-height:1.5;}
+
+@media (prefers-reduced-motion: reduce){
+  .xlr-cover-ring{animation:none;}
+  .xlr-cta,.xlr-plan{transition:none;}
+}
+`;
