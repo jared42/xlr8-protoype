@@ -313,6 +313,7 @@ function(a,b,c){if(!Vd(b))throw Error(m(200));return Wd(null,a,b,!1,c)};Q.unmoun
 /*  Core job-to-be-done: your research never stalls on a restock.      */
 /*  Recurring membership + auto-ship, framed for Research-Use-Only.     */
 /* ------------------------------------------------------------------ */
+const { useState, useMemo, useEffect, useRef, useCallback } = React;
 
 const PRODUCTS = [{
   id: "reta",
